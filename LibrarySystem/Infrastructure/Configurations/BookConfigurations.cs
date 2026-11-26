@@ -23,6 +23,7 @@ namespace LibrarySystem.Infrastructure.Configurations
                 .WithMany(a => a.Books)
                 .HasForeignKey(b => b.AuthorId)
                 .OnDelete(DeleteBehavior.Restrict);
+            builder.HasQueryFilter(b => !b.IsDeleted);
         }
     }
 }

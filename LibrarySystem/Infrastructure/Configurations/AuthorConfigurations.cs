@@ -14,6 +14,7 @@ namespace LibrarySystem.Infrastructure.Configurations
 
             builder.Property(a => a.BirthDate)
                 .HasColumnType("date");
+            builder.HasQueryFilter(a => !a.IsDeleted);
         }
     }
 }

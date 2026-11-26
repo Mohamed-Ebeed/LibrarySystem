@@ -1,114 +1,62 @@
-﻿using AutoMapper;
-using LibrarySystem.Domain;
-using LibrarySystem.Dtos.Author;
-using LibrarySystem.Helper;
-using LibrarySystem.Infrastructure.Data;
+﻿using LibrarySystem.Dtos.Author;
 using LibrarySystem.Results;
+using LibrarySystem.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LibrarySystem.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class AuthorsController(LibraryDbContext dbContext, IMapper mapper, ILogger<AuthorsController> logger) : ControllerBase
+    public class AuthorsController(IAuthorService service) : BaseApiController
     {
         /// <summary>
         /// Get all authors with pagination, search by name and filter by birth date.
         /// </summary>
         [HttpGet]
+        [ProducesResponseType(typeof(GenericResult<PaginatedList<AuthorResponse>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAll(int pageNumber = 1, int pageSize = 10, string? search = null, DateTime? bornFrom = null, DateTime? bornTo = null)
-        {
-            var query = dbContext.Authors.Include(a => a.Books).AsNoTracking().AsQueryable();
-
-            // searching
-            if (!string.IsNullOrEmpty(search))
-                query = query.Where(a => a.Name.Contains(search));
-
-            // filtration
-            if (bornFrom is not null)
-                query = query.Where(a => a.BirthDate >= bornFrom);
-            if (bornTo is not null)
-                query = query.Where(a => a.BirthDate <= bornTo);
-
-            var page = await query.OrderBy(a => a.Id).ToPaginatedListAsync(pageNumber, pageSize);
-            logger.LogInformation("Got {Count} authors (page {Page})", page.TotalRecords, page.PageNumber);
-
-            var response = page.MapTo<Author, AuthorResponse>(mapper);
-            return Ok(GenericResult<PaginatedList<AuthorResponse>>.Success(response));
-        }
+            => HandleResult(await service.GetAllAsync(pageNumber, pageSize, search, bornFrom, bornTo));
 
         /// <summary>
-        /// Get one author by id.
+        /// Get one author by id with his books.
         /// </summary>
         [HttpGet("{id:int}")]
+        [ProducesResponseType(typeof(GenericResult<AuthorResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(GenericResult<AuthorResponse>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)
-        {
-            var author = await dbContext.Authors.Include(a => a.Books).FirstOrDefaultAsync(a => a.Id == id);
-            if (author is null)
-            {
-                logger.LogWarning("Author with Id = {Id} is not found", id);
-                return NotFound(GenericResult<AuthorResponse>.NotFound($"Author with Id = {id} is not found."));
-            }
-
-            return Ok(GenericResult<AuthorResponse>.Success(mapper.Map<AuthorResponse>(author)));
-        }
+            => HandleResult(await service.GetByIdAsync(id));
 
         /// <summary>
         /// Add a new author.
         /// </summary>
         [HttpPost]
+        [ProducesResponseType(typeof(GenericResult<AuthorResponse>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(GenericResult<AuthorResponse>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create(CreateAuthorRequest request)
         {
-            if (request.BirthDate > DateTime.Today)
-                return BadRequest(GenericResult<AuthorResponse>.Failure("Birth date can't be in the future."));
+            var result = await service.CreateAsync(request);
+            if (result.IsFailure)
+                return HandleResult(result);
 
-            var author = mapper.Map<Author>(request);
-            await dbContext.Authors.AddAsync(author);
-            await dbContext.SaveChangesAsync();
-
-            logger.LogInformation("Author {Name} created with Id = {Id}", author.Name, author.Id);
-            var result = GenericResult<AuthorResponse>.Success(mapper.Map<AuthorResponse>(author));
-            return CreatedAtAction(nameof(GetById), new { id = author.Id }, result);
+            return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result);
         }
 
         /// <summary>
         /// Update an author.
         /// </summary>
         [HttpPut]
+        [ProducesResponseType(typeof(GenericResult<AuthorResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(GenericResult<AuthorResponse>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Update(UpdateAuthorRequest request)
-        {
-            if (request.BirthDate > DateTime.Today)
-                return BadRequest(GenericResult<AuthorResponse>.Failure("Birth date can't be in the future."));
-
-            var author = await dbContext.Authors.Include(a => a.Books).FirstOrDefaultAsync(a => a.Id == request.Id);
-            if (author is null)
-                return NotFound(GenericResult<AuthorResponse>.NotFound($"Author with Id = {request.Id} is not found."));
-
-            mapper.Map(request, author);
-            await dbContext.SaveChangesAsync();
-
-            return Ok(GenericResult<AuthorResponse>.Success(mapper.Map<AuthorResponse>(author)));
-        }
+            => HandleResult(await service.UpdateAsync(request));
 
         /// <summary>
-        /// Delete an author (not allowed if he has books).
+        /// Delete an author (soft delete). Not allowed if he has books.
         /// </summary>
         [HttpDelete("{id:int}")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Delete(int id)
-        {
-            var author = await dbContext.Authors.FirstOrDefaultAsync(a => a.Id == id);
-            if (author is null)
-                return NotFound(Result.NotFound($"Author with Id = {id} is not found."));
-
-            if (await dbContext.Books.AnyAsync(b => b.AuthorId == id))
-                return BadRequest(Result.Failure("Can't delete this author because he has books."));
-
-            dbContext.Authors.Remove(author);
-            await dbContext.SaveChangesAsync();
-
-            logger.LogInformation("Author with Id = {Id} deleted", id);
-            return Ok(Result.Success());
-        }
+            => HandleResult(await service.DeleteAsync(id));
     }
 }

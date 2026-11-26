@@ -18,6 +18,7 @@ namespace LibrarySystem.Infrastructure.Configurations
                 .WithMany(b => b.Loans)
                 .HasForeignKey(l => l.BorrowerId)
                 .OnDelete(DeleteBehavior.Restrict);
+            builder.HasQueryFilter(l => !l.IsDeleted);
         }
     }
 }

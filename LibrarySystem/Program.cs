@@ -1,4 +1,4 @@
-using LibrarySystem.Helper;
+using LibrarySystem.Extensions;
 using LibrarySystem.Infrastructure.Data;
 using LibrarySystem.Seeding;
 using Microsoft.EntityFrameworkCore;
@@ -12,28 +12,12 @@ namespace LibrarySystem
             var builder = WebApplication.CreateBuilder(args);
 
             builder.Services.AddControllers();
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen(options =>
-            {
-                var xmlFile = $"{typeof(Program).Assembly.GetName().Name}.xml";
-                options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
-            });
-
-            builder.Services.AddDbContext<LibraryDbContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultSqlConnection")));
-
-            #region Session 02 - AutoMapper
-            builder.Services.AddAutoMapper(cfg =>
-            {
-                cfg.AddProfile<AuthorProfile>();
-                cfg.AddProfile<BorrowerProfile>();
-                cfg.AddProfile<LoanProfile>();
-            });
-            #endregion
+            // كل التسجيلات في ApplicationServiceExtension
+            builder.Services.AddServices(builder.Configuration);
 
             var app = builder.Build();
 
-            #region Session 02 - Auto Migration + Seeding
+            #region Auto Migration + Seeding
             using (var scope = app.Services.CreateScope())
             {
                 var services = scope.ServiceProvider;
