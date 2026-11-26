@@ -1,0 +1,19 @@
+﻿using LibrarySystem.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace LibrarySystem.Infrastructure.Configurations
+{
+    public class BorrowerConfigurations : IEntityTypeConfiguration<Borrower>
+    {
+        public void Configure(EntityTypeBuilder<Borrower> builder)
+        {
+            builder.Property(b => b.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            builder.Property(b => b.MembershipDate)
+                .HasColumnType("date");
+        }
+    }
+}

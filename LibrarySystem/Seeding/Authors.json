@@ -1,0 +1,40 @@
+[
+  {
+    "Name": "Naguib Mahfouz",
+    "BirthDate": "1911-12-11",
+    "Books": [
+      {
+        "Title": "Palace Walk",
+        "ISBN": "9780385264662"
+      },
+      {
+        "Title": "Children of the Alley",
+        "ISBN": "9780385264730"
+      }
+    ]
+  },
+  {
+    "Name": "Ahmed Khaled Tawfik",
+    "BirthDate": "1962-06-10",
+    "Books": [
+      {
+        "Title": "Utopia",
+        "ISBN": "9781905299850"
+      }
+    ]
+  },
+  {
+    "Name": "Robert C. Martin",
+    "BirthDate": "1952-12-05",
+    "Books": [
+      {
+        "Title": "Clean Code",
+        "ISBN": "9780132350884"
+      },
+      {
+        "Title": "Clean Architecture",
+        "ISBN": "9780134494166"
+      }
+    ]
+  }
+]

@@ -1,6 +1,9 @@
-﻿using LibrarySystem.Domain;
+﻿using AutoMapper;
+using LibrarySystem.Domain;
 using LibrarySystem.Dtos.Borrower;
+using LibrarySystem.Helper;
 using LibrarySystem.Infrastructure.Data;
+using LibrarySystem.Results;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,93 +11,94 @@ namespace LibrarySystem.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class BorrowersController : ControllerBase
+    public class BorrowersController(LibraryDbContext dbContext, IMapper mapper, ILogger<BorrowersController> logger) : ControllerBase
     {
-        private readonly LibraryDbContext _dbContext;
-
-        public BorrowersController(LibraryDbContext dbContext)
-        {
-            _dbContext = dbContext;
-        }
-
+        /// <summary>
+        /// Get all borrowers with pagination, search by name and filter by membership date.
+        /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(int pageNumber = 1, int pageSize = 10, string? search = null, DateTime? memberSince = null)
         {
-            var borrowers = await _dbContext.Borrowers
-                .Include(b => b.Loans)
-                .ToListAsync();
+            var query = dbContext.Borrowers.Include(b => b.Loans).AsNoTracking().AsQueryable();
 
-            return Ok(borrowers.Select(ToResponse).ToList());
+            if (!string.IsNullOrEmpty(search))
+                query = query.Where(b => b.Name.Contains(search));
+
+            if (memberSince is not null)
+                query = query.Where(b => b.MembershipDate >= memberSince);
+
+            var page = await query.OrderBy(b => b.Id).ToPaginatedListAsync(pageNumber, pageSize);
+            logger.LogInformation("Got {Count} borrowers (page {Page})", page.TotalRecords, page.PageNumber);
+
+            var response = page.MapTo<Borrower, BorrowerResponse>(mapper);
+            return Ok(GenericResult<PaginatedList<BorrowerResponse>>.Success(response));
         }
 
+        /// <summary>
+        /// Get one borrower by id.
+        /// </summary>
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var borrower = await _dbContext.Borrowers
-                .Include(b => b.Loans)
-                .FirstOrDefaultAsync(b => b.Id == id);
-
+            var borrower = await dbContext.Borrowers.Include(b => b.Loans).FirstOrDefaultAsync(b => b.Id == id);
             if (borrower is null)
-                return NotFound($"Borrower with Id = {id} is not found.");
+            {
+                logger.LogWarning("Borrower with Id = {Id} is not found", id);
+                return NotFound(GenericResult<BorrowerResponse>.NotFound($"Borrower with Id = {id} is not found."));
+            }
 
-            return Ok(ToResponse(borrower));
+            return Ok(GenericResult<BorrowerResponse>.Success(mapper.Map<BorrowerResponse>(borrower)));
         }
 
+        /// <summary>
+        /// Add a new borrower.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> Create(CreateBorrowerRequest request)
         {
-            var borrower = new Borrower
-            {
-                Name = request.Name,
-                MembershipDate = request.MembershipDate ?? DateTime.Today
-            };
+            var borrower = mapper.Map<Borrower>(request);
+            await dbContext.Borrowers.AddAsync(borrower);
+            await dbContext.SaveChangesAsync();
 
-            await _dbContext.Borrowers.AddAsync(borrower);
-            await _dbContext.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = borrower.Id }, ToResponse(borrower));
+            logger.LogInformation("Borrower {Name} created with Id = {Id}", borrower.Name, borrower.Id);
+            var result = GenericResult<BorrowerResponse>.Success(mapper.Map<BorrowerResponse>(borrower));
+            return CreatedAtAction(nameof(GetById), new { id = borrower.Id }, result);
         }
 
+        /// <summary>
+        /// Update a borrower.
+        /// </summary>
         [HttpPut]
         public async Task<IActionResult> Update(UpdateBorrowerRequest request)
         {
-            var borrower = await _dbContext.Borrowers
-                .Include(b => b.Loans)
-                .FirstOrDefaultAsync(b => b.Id == request.Id);
-
+            var borrower = await dbContext.Borrowers.Include(b => b.Loans).FirstOrDefaultAsync(b => b.Id == request.Id);
             if (borrower is null)
-                return NotFound($"Borrower with Id = {request.Id} is not found.");
+                return NotFound(GenericResult<BorrowerResponse>.NotFound($"Borrower with Id = {request.Id} is not found."));
 
-            borrower.Name = request.Name;
-            borrower.MembershipDate = request.MembershipDate;
+            mapper.Map(request, borrower);
+            await dbContext.SaveChangesAsync();
 
-            await _dbContext.SaveChangesAsync();
-
-            return Ok(ToResponse(borrower));
+            return Ok(GenericResult<BorrowerResponse>.Success(mapper.Map<BorrowerResponse>(borrower)));
         }
 
+        /// <summary>
+        /// Delete a borrower (not allowed if he still has books).
+        /// </summary>
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var borrower = await _dbContext.Borrowers.FirstOrDefaultAsync(b => b.Id == id);
+            var borrower = await dbContext.Borrowers.FirstOrDefaultAsync(b => b.Id == id);
             if (borrower is null)
-                return NotFound($"Borrower with Id = {id} is not found.");
+                return NotFound(Result.NotFound($"Borrower with Id = {id} is not found."));
 
-            if (await _dbContext.Loans.AnyAsync(l => l.BorrowerId == id && l.ReturnDate == null))
-                return BadRequest("Can't delete this borrower, he still has books not returned.");
+            if (await dbContext.Loans.AnyAsync(l => l.BorrowerId == id && l.ReturnDate == null))
+                return BadRequest(Result.Failure("Can't delete this borrower, he still has books not returned."));
 
-            _dbContext.Borrowers.Remove(borrower);
-            await _dbContext.SaveChangesAsync();
+            dbContext.Borrowers.Remove(borrower);
+            await dbContext.SaveChangesAsync();
 
-            return Ok("Borrower deleted successfully!");
+            logger.LogInformation("Borrower with Id = {Id} deleted", id);
+            return Ok(Result.Success());
         }
-
-        private static BorrowerResponse ToResponse(Borrower borrower) => new BorrowerResponse
-        {
-            Id = borrower.Id,
-            Name = borrower.Name,
-            MembershipDate = borrower.MembershipDate,
-            ActiveLoansCount = borrower.Loans.Count(l => l.ReturnDate == null)
-        };
     }
 }
