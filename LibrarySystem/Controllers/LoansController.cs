@@ -1,16 +1,22 @@
-﻿using LibrarySystem.Dtos.Loan;
+﻿
+using LibrarySystem.Controllers;
+using LibrarySystem.Dtos.Loan;
+using LibrarySystem.Filters;
 using LibrarySystem.Results;
 using LibrarySystem.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace LibrarySystem.Controllers
+namespace DEPI_Session4_WebApi.Controllers
 {
     [Route("api/[controller]")]
+    [ServiceFilter(typeof(ExceptionHandlingFilter))]
+    [ServiceFilter(typeof(ActionTimingFilter))]
     public class LoansController(ILoanService service) : BaseApiController
     {
         /// <summary>
         /// Get all loans with pagination, filter by book, borrower, or returned / not returned.
         /// </summary>
+        /// <example>GET /api/Loans?borrowerId=1&amp;isReturned=false</example>
         [HttpGet]
         [ProducesResponseType(typeof(GenericResult<PaginatedList<LoanResponse>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAll(int pageNumber = 1, int pageSize = 10, int? bookId = null, int? borrowerId = null, bool? isReturned = null)
@@ -20,6 +26,7 @@ namespace LibrarySystem.Controllers
         /// Get one loan by id.
         /// </summary>
         [HttpGet("{id:int}")]
+        [ServiceFilter(typeof(ActionExecutionLoggingFilter))]
         [ProducesResponseType(typeof(GenericResult<LoanResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(GenericResult<LoanResponse>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)

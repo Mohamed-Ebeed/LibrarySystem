@@ -1,5 +1,10 @@
 using LibrarySystem.Extensions;
 using LibrarySystem.Infrastructure.Data;
+using LibrarySystem.Middleware;
+using LibrarySystem.Seeding;
+using LibrarySystem.Extensions;
+using LibrarySystem.Infrastructure.Data;
+using LibrarySystem.Middleware;
 using LibrarySystem.Seeding;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +17,7 @@ namespace LibrarySystem
             var builder = WebApplication.CreateBuilder(args);
 
             builder.Services.AddControllers();
-            // كل التسجيلات في ApplicationServiceExtension
+            // all the registrations are in ApplicationServiceExtension
             builder.Services.AddServices(builder.Configuration);
 
             var app = builder.Build();
@@ -35,17 +40,24 @@ namespace LibrarySystem
             }
             #endregion
 
+            #region Middlewares (order matters)
+            app.UseMiddleware<ExceptionHandlingMiddleware>();
+            app.UseMiddleware<RequestTimingMiddleware>();
+            app.UseMiddleware<RequestIdHeaderMiddleware>();
+
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
-            else
-            {
-                app.UseHttpsRedirection();
-            }
+
+            app.UseHttpsRedirection();
+
+            app.UseCors(ApplicationServiceExtension.CorsPolicyName);
 
             app.UseAuthorization();
+            #endregion
+
             app.MapControllers();
 
             app.Run();

@@ -1,11 +1,16 @@
-﻿using LibrarySystem.Dtos.Borrower;
+﻿
+using LibrarySystem.Controllers;
+using LibrarySystem.Dtos.Borrower;
+using LibrarySystem.Filters;
 using LibrarySystem.Results;
 using LibrarySystem.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace LibrarySystem.Controllers
+namespace DEPI_Session4_WebApi.Controllers
 {
     [Route("api/[controller]")]
+    [ServiceFilter(typeof(ExceptionHandlingFilter))]
+    [ServiceFilter(typeof(ActionTimingFilter))]
     public class BorrowersController(IBorrowerService service) : BaseApiController
     {
         /// <summary>
@@ -20,6 +25,7 @@ namespace LibrarySystem.Controllers
         /// Get one borrower by id.
         /// </summary>
         [HttpGet("{id:int}")]
+        [ServiceFilter(typeof(ActionExecutionLoggingFilter))]
         [ProducesResponseType(typeof(GenericResult<BorrowerResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(GenericResult<BorrowerResponse>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)

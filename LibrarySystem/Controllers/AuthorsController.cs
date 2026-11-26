@@ -1,16 +1,21 @@
 ﻿using LibrarySystem.Dtos.Author;
+using LibrarySystem.Filters;
 using LibrarySystem.Results;
 using LibrarySystem.Services;
+using LibrarySystem.Controllers;
 using Microsoft.AspNetCore.Mvc;
 
-namespace LibrarySystem.Controllers
+namespace DEPI_Session4_WebApi.Controllers
 {
     [Route("api/[controller]")]
+    [ServiceFilter(typeof(ExceptionHandlingFilter))]
+    [ServiceFilter(typeof(ActionTimingFilter))]
     public class AuthorsController(IAuthorService service) : BaseApiController
     {
         /// <summary>
         /// Get all authors with pagination, search by name and filter by birth date.
         /// </summary>
+        /// <example>GET /api/Authors?pageNumber=1&amp;pageSize=5&amp;search=Nag</example>
         [HttpGet]
         [ProducesResponseType(typeof(GenericResult<PaginatedList<AuthorResponse>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAll(int pageNumber = 1, int pageSize = 10, string? search = null, DateTime? bornFrom = null, DateTime? bornTo = null)
@@ -20,6 +25,7 @@ namespace LibrarySystem.Controllers
         /// Get one author by id with his books.
         /// </summary>
         [HttpGet("{id:int}")]
+        [ServiceFilter(typeof(ActionExecutionLoggingFilter))]
         [ProducesResponseType(typeof(GenericResult<AuthorResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(GenericResult<AuthorResponse>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)

@@ -4,11 +4,14 @@ using LibrarySystem.Infrastructure.Interceptors;
 using LibrarySystem.Repositories;
 using LibrarySystem.Services;
 using Microsoft.EntityFrameworkCore;
+using LibrarySystem.Filters;
+using LibrarySystem.Middleware;
 
 namespace LibrarySystem.Extensions
 {
     public static class ApplicationServiceExtension
     {
+        public const string CorsPolicyName = "ConfigurationOrigins";
         public static IServiceCollection AddServices(this IServiceCollection services, IConfiguration configuration)
         {
             #region Session 01 - EF Core + Swagger
@@ -42,7 +45,24 @@ namespace LibrarySystem.Extensions
             services.AddScoped<IBorrowerService, BorrowerService>();
             services.AddScoped<ILoanService, LoanService>();
             #endregion
+            #region Session 04 - Middlewares, Filters, CORS
+            services.AddTransient<RequestIdHeaderMiddleware>();
 
+            services.AddScoped<ActionExecutionLoggingFilter>();
+            services.AddScoped<ActionTimingFilter>();
+            services.AddScoped<ExceptionHandlingFilter>();
+
+            var corsOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+            services.AddCors(options =>
+                options.AddPolicy(CorsPolicyName, policy =>
+                {
+                    // بس الـ origins اللي في appsettings تقدر تنادي الـ API من متصفح
+                    if (corsOrigins.Length > 0)
+                        policy.WithOrigins(corsOrigins);
+
+                    policy.AllowAnyHeader().AllowAnyMethod();
+                }));
+            #endregion
             return services;
         }
     }
