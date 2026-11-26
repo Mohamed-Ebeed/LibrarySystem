@@ -1,13 +1,14 @@
-﻿
-using LibrarySystem.Controllers;
+﻿using LibrarySystem.Controllers;
 using LibrarySystem.Dtos.Loan;
 using LibrarySystem.Filters;
 using LibrarySystem.Results;
 using LibrarySystem.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DEPI_Session4_WebApi.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ServiceFilter(typeof(ExceptionHandlingFilter))]
     [ServiceFilter(typeof(ActionTimingFilter))]
